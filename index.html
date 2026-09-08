@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browser Games</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #120c17;
+    --panel: #1c1424;
+    --panel-edge: #2c2038;
+    --neon-pink: #ff2f6e;
+    --neon-mint: #3ef2c0;
+    --ink: #eaf7ef;
+    --ink-dim: #9fb8ac;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(ellipse 90% 70% at 50% 10%, #241830 0%, var(--void) 60%);
+    color: var(--ink);
+    font-family: "Share Tech Mono", monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+  main { width: 100%; max-width: 720px; }
+  h1 {
+    font-family: "Press Start 2P", monospace;
+    font-size: clamp(18px, 4vw, 28px);
+    color: var(--neon-pink);
+    text-shadow: 0 0 8px var(--neon-pink), 0 0 22px rgba(255,47,110,0.4);
+    text-align: center;
+    letter-spacing: 2px;
+    margin: 0 0 8px;
+    text-wrap: balance;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--ink-dim);
+    font-size: 14px;
+    margin: 0 0 36px;
+  }
+  .games {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+  }
+  a.card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: linear-gradient(175deg, var(--panel-edge) 0%, var(--panel) 60%);
+    border: 1px solid rgba(62,242,192,0.2);
+    border-radius: 10px;
+    padding: 22px 20px;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  a.card:hover, a.card:focus-visible {
+    border-color: var(--neon-mint);
+    transform: translateY(-2px);
+  }
+  a.card:focus-visible { outline: 2px solid var(--neon-mint); outline-offset: 3px; }
+  .card h2 {
+    font-family: "Press Start 2P", monospace;
+    font-size: 13px;
+    color: var(--neon-mint);
+    margin: 0 0 10px;
+    letter-spacing: 1px;
+  }
+  .card p {
+    margin: 0;
+    color: var(--ink-dim);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>BROWSER GAMES</h1>
+    <p class="subtitle">two small games, playable right in your browser</p>
+    <div class="games">
+      <a class="card" href="tic-tac-toe.html">
+        <h2>Chalkboard Tic-Tac-Toe</h2>
+        <p>Classic two-player tic-tac-toe drawn like chalk on a blackboard, with a running score tally.</p>
+      </a>
+      <a class="card" href="sector-sweep.html">
+        <h2>Sector Sweep</h2>
+        <p>Retro top-down arcade shooter. Arrow keys move, mouse aims and fires. Five sectors of enemies to clear.</p>
+      </a>
+    </div>
+  </main>
+</body>
+</html>
