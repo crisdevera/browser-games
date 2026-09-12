@@ -297,6 +297,28 @@
   .overlay .stats .hl { color: var(--brand); }
   .overlay .stats .hl2 { color: var(--accent); }
 
+  #screenGameOver h1 {
+    color: #ff4040;
+    text-shadow: 0 0 10px #ff4040, 0 0 24px rgba(255,64,64,0.5);
+  }
+  #screenGameOver .stats { color: #ffb3b3; }
+  #screenGameOver .stats .hl { color: #ff4040; }
+  #screenGameOver .stats .hl2 { color: #ff6a6a; }
+  .flash-warning {
+    font-family: "Press Start 2P", monospace;
+    font-size: clamp(9px, 1.8vw, 13px);
+    color: #ff4040;
+    text-shadow: 0 0 8px rgba(255,64,64,0.7);
+    letter-spacing: 1px;
+    line-height: 1.6;
+    margin: 0;
+    text-wrap: balance;
+    animation: flashWarn 0.7s steps(2, start) infinite;
+  }
+  @keyframes flashWarn {
+    50% { opacity: 0.15; }
+  }
+
   .btn-arcade {
     font-family: "Press Start 2P", monospace;
     font-size: 12px;
@@ -343,6 +365,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .btn-arcade { transition: none; }
+    .flash-warning { animation: none; }
   }
 </style>
 
@@ -425,6 +448,7 @@
 
     <div class="overlay" id="screenGameOver" hidden>
       <h1>RISK EXPOSURE CRITICAL</h1>
+      <p class="flash-warning">YOUR PROBs ARE BEING ESCALATED IN BOARD REPORTING</p>
       <p class="stats" id="goStats"></p>
       <button class="btn-arcade" id="btnRestart" type="button">RESTART</button>
     </div>
@@ -746,6 +770,7 @@
     hud.hidden = !(s === 'PLAYING' || s === 'PAUSED');
     introSkip.hidden = s !== 'INTRO';
     if (s !== 'INTRO') introBubble.hidden = true;
+    applyMusicForState(s);
   }
 
   function togglePause() {
@@ -754,8 +779,6 @@
   }
 
   function beginIntro() {
-    ensureAudio();
-    if (musicOn) startMusic();
     game.introTimer = 0;
     game.introPhase = 0;
     setState('INTRO');
@@ -825,6 +848,7 @@
       var speed = rand(60, 160);
       game.particles.push(makeParticle(mx, my, Math.cos(spread) * speed, Math.sin(spread) * speed, COLORS.muzzle, 0.12));
     }
+    playShootSfx();
   }
 
   function updateBullets(dt) {
@@ -909,6 +933,7 @@
   function damagePlayer(amount, kx, ky) {
     var p = game.player;
     if (p.invulnTimer > 0 || p.shieldTimer > 0) return;
+    playHitSfx();
     p.hp = clamp(p.hp - amount, 0, p.maxHp);
     p.invulnTimer = HIT_INVULN;
     game.screenShake = reduceMotion ? 0.08 : 0.24;
@@ -1314,7 +1339,7 @@
   }, { passive: true });
   canvas.addEventListener('touchend', function () { mouseDown = false; });
 
-  // ============================== SECTION J: MUSIC ENGINE ==============================
+  // ============================== SECTION J: AUDIO ENGINE ==============================
   var NOTE_FREQ = {
     R: 0,
     C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94,
@@ -1328,6 +1353,8 @@
   var STEP_DUR = 60 / MUSIC_BPM / 2;
   var SCHEDULE_AHEAD = 0.12;
   var MUSIC_VOLUME = 0.16;
+  var SIREN_LOW = 520, SIREN_HIGH = 880, SIREN_HALF_PERIOD = 0.5;
+  var SIREN_VOLUME = 0.13;
 
   var musicOn = (function () {
     try {
@@ -1336,7 +1363,10 @@
     } catch (e) { return true; }
   })();
 
-  var audioCtx = null, musicGain = null, musicTimer = null, nextStepTime = 0, stepIndex = 0;
+  var audioCtx = null, musicGain = null, sfxGain = null;
+  var musicTimer = null, nextStepTime = 0, stepIndex = 0;
+  var sirenOsc = null, sirenGainNode = null, sirenTimer = null, sirenNextTime = 0, sirenUp = true;
+  var noiseBuffer = null;
 
   function ensureAudio() {
     if (audioCtx) {
@@ -1349,8 +1379,12 @@
     musicGain = audioCtx.createGain();
     musicGain.gain.value = musicOn ? MUSIC_VOLUME : 0;
     musicGain.connect(audioCtx.destination);
+    sfxGain = audioCtx.createGain();
+    sfxGain.gain.value = 0.4;
+    sfxGain.connect(audioCtx.destination);
   }
 
+  // ---- menu chiptune ----
   function playNote(freq, time, dur, type, vol) {
     if (!freq) return;
     var osc = audioCtx.createOscillator();
@@ -1391,6 +1425,54 @@
     if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
   }
 
+  // ---- intro siren ("wee-ooo") ----
+  function sirenTick() {
+    while (sirenNextTime < audioCtx.currentTime + SCHEDULE_AHEAD + 0.3) {
+      var target = sirenUp ? SIREN_HIGH : SIREN_LOW;
+      sirenOsc.frequency.linearRampToValueAtTime(target, sirenNextTime + SIREN_HALF_PERIOD);
+      sirenNextTime += SIREN_HALF_PERIOD;
+      sirenUp = !sirenUp;
+    }
+  }
+
+  function startSiren() {
+    if (!audioCtx || sirenOsc) return;
+    sirenOsc = audioCtx.createOscillator();
+    sirenOsc.type = 'triangle';
+    sirenGainNode = audioCtx.createGain();
+    sirenGainNode.gain.value = SIREN_VOLUME;
+    sirenOsc.connect(sirenGainNode);
+    sirenGainNode.connect(musicGain);
+    var now = audioCtx.currentTime + 0.05;
+    sirenOsc.frequency.setValueAtTime(SIREN_LOW, now);
+    sirenNextTime = now;
+    sirenUp = true;
+    sirenOsc.start(now);
+    sirenTick();
+    sirenTimer = setInterval(sirenTick, 100);
+  }
+
+  function stopSiren() {
+    if (sirenTimer) { clearInterval(sirenTimer); sirenTimer = null; }
+    if (sirenOsc) {
+      try { sirenOsc.stop(); } catch (e) { /* ignore */ }
+      sirenOsc.disconnect();
+      sirenOsc = null;
+    }
+    if (sirenGainNode) { sirenGainNode.disconnect(); sirenGainNode = null; }
+  }
+
+  // ---- per-screen music orchestration ----
+  function applyMusicForState(state) {
+    stopMusic();
+    stopSiren();
+    if (!musicOn) return;
+    ensureAudio();
+    if (!audioCtx) return;
+    if (state === 'MENU') startMusic();
+    else if (state === 'INTRO') startSiren();
+  }
+
   function updateMusicButton() {
     btnMusic.classList.toggle('muted', !musicOn);
     btnMusic.setAttribute('aria-label', musicOn ? 'Mute music' : 'Unmute music');
@@ -1400,13 +1482,8 @@
     musicOn = !musicOn;
     try { localStorage.setItem(MUSIC_KEY, musicOn ? '1' : '0'); } catch (e) { /* ignore */ }
     ensureAudio();
-    if (musicOn) {
-      if (musicGain) musicGain.gain.value = MUSIC_VOLUME;
-      startMusic();
-    } else {
-      if (musicGain) musicGain.gain.value = 0;
-      stopMusic();
-    }
+    if (musicGain) musicGain.gain.value = musicOn ? MUSIC_VOLUME : 0;
+    applyMusicForState(game.state);
     updateMusicButton();
   }
 
@@ -1416,11 +1493,58 @@
   function firstGestureAudioUnlock() {
     window.removeEventListener('pointerdown', firstGestureAudioUnlock);
     window.removeEventListener('keydown', firstGestureAudioUnlock);
-    ensureAudio();
-    if (musicOn) startMusic();
+    applyMusicForState(game.state);
   }
   window.addEventListener('pointerdown', firstGestureAudioUnlock);
   window.addEventListener('keydown', firstGestureAudioUnlock);
+
+  // ---- sound effects (always on, independent of the music toggle) ----
+  function getNoiseBuffer() {
+    if (noiseBuffer) return noiseBuffer;
+    var len = Math.floor(audioCtx.sampleRate * 0.3);
+    noiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    var data = noiseBuffer.getChannelData(0);
+    for (var i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    return noiseBuffer;
+  }
+
+  function playShootSfx() {
+    ensureAudio();
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(950, t);
+    osc.frequency.exponentialRampToValueAtTime(240, t + 0.08);
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    osc.connect(g);
+    g.connect(sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  }
+
+  function playHitSfx() {
+    ensureAudio();
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime;
+    var src = audioCtx.createBufferSource();
+    src.buffer = getNoiseBuffer();
+    var bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 1.1;
+    bp.frequency.setValueAtTime(2000, t);
+    bp.frequency.exponentialRampToValueAtTime(280, t + 0.13);
+    var g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.4, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+    src.connect(bp);
+    bp.connect(g);
+    g.connect(sfxGain);
+    src.start(t);
+    src.stop(t + 0.16);
+  }
 
   // ============================== SECTION K: CANVAS SETUP ==============================
   function setupCanvas() {
