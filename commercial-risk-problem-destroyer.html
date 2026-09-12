@@ -298,8 +298,13 @@
   .overlay .stats .hl2 { color: var(--accent); }
 
   #screenGameOver h1 {
-    color: #ff4040;
-    text-shadow: 0 0 10px #ff4040, 0 0 24px rgba(255,64,64,0.5);
+    color: #ff5050;
+    text-shadow:
+      1px 1px 0 #200000,
+      -1px -1px 0 #200000,
+      1px -1px 0 #200000,
+      -1px 1px 0 #200000,
+      0 0 6px rgba(255,64,64,0.55);
   }
   #screenGameOver .stats { color: #ffb3b3; }
   #screenGameOver .stats .hl { color: #ff4040; }
@@ -842,13 +847,13 @@
     var angles = p.spreadTimer > 0 ? [p.aimAngle - SPREAD_ANGLE, p.aimAngle, p.aimAngle + SPREAD_ANGLE] : [p.aimAngle];
     for (var a = 0; a < angles.length; a++) {
       game.bullets.push(makeBullet(mx, my, angles[a], BULLET_SPEED));
+      playShootSfx(a * 0.045);
     }
     for (var i = 0; i < 3; i++) {
       var spread = p.aimAngle + rand(-0.3, 0.3);
       var speed = rand(60, 160);
       game.particles.push(makeParticle(mx, my, Math.cos(spread) * speed, Math.sin(spread) * speed, COLORS.muzzle, 0.12));
     }
-    playShootSfx();
   }
 
   function updateBullets(dt) {
@@ -1016,6 +1021,7 @@
     else if (kind === 'heal') p.hp = p.maxHp;
     else if (kind === 'life') game.lives = Math.min(LIVES_MAX, game.lives + 1);
     game.score += 25;
+    playPickupSfx();
   }
 
   function updateParticles(dt) {
@@ -1508,10 +1514,10 @@
     return noiseBuffer;
   }
 
-  function playShootSfx() {
+  function playShootSfx(delay) {
     ensureAudio();
     if (!audioCtx) return;
-    var t = audioCtx.currentTime;
+    var t = audioCtx.currentTime + (delay || 0);
     var osc = audioCtx.createOscillator();
     var g = audioCtx.createGain();
     osc.type = 'square';
@@ -1523,6 +1529,27 @@
     g.connect(sfxGain);
     osc.start(t);
     osc.stop(t + 0.1);
+  }
+
+  function playPickupSfx() {
+    ensureAudio();
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime;
+    var notes = [1046.5, 1568.0];
+    for (var i = 0; i < notes.length; i++) {
+      var start = t + i * 0.07;
+      var osc = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(notes[i], start);
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.linearRampToValueAtTime(0.3, start + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
+      osc.connect(g);
+      g.connect(sfxGain);
+      osc.start(start);
+      osc.stop(start + 0.26);
+    }
   }
 
   function playHitSfx() {
